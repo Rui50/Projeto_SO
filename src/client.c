@@ -6,7 +6,10 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include "../include/client.h"
+
 #define MAX_SIZE 500
+#define MFIFO "tmp/mfifo"
 
 int main(int argc, char **argv){
 
@@ -15,20 +18,9 @@ int main(int argc, char **argv){
         return -1;
     }
 
-
     // vai servir como "uid do cliente"
     int mypid = getpid(); 
-
-    char *com_fifo = malloc(MAX_SIZE);
-    snprintf(com_fifo, MAX_SIZE, "tmp/com_fifo_%d", mypid);
-
-    printf("%s\n", com_fifo);
-
-    int fifo = mkfifo(com_fifo, 0664);
-    if(fifo == -1){
-        perror("Error creating communication fifo");
-    }
-
+    
     char data_buffer[MAX_SIZE];
 
     //execute time -u "prog-a [args]"
@@ -47,18 +39,20 @@ int main(int argc, char **argv){
             if(i != 5) strcat(exec_args, " ");
             strcat(exec_args, argv[i]);
         }
-
-        int fd = open(com_fifo, O_WRONLY);
+        
+        printf("Opening FIFO for writing\n");
+        int fd = open(MFIFO, O_WRONLY);
         if(fd == -1){
             perror("Error opening FIFO for writing");
-            free(com_fifo);
             return -1;
         }
 
         // format
         // comando;exec_time;program_to_execute;modo;exec_args
-        snprintf(data_buffer, MAX_SIZE, "execute;%s;%s;%s", exec_time, program, exec_args);
 
+        // enviar tambme o seu pid para abrir o fifo de retorno?
+        snprintf(data_buffer, MAX_SIZE, "execute;%s;%s;%s;%s", exec_time, mode, program, exec_args);
+        printf("Sending request: %s\n", data_buffer);
         if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
             perror("Error writing to FIFO");
         }
@@ -69,15 +63,11 @@ int main(int argc, char **argv){
 
     else if (strcmp(argv[1], "status") == 0) {
         printf("Solicitando status das tarefas ao servidor...\n");
-
-
     }
     
     else {
         printf("Comando desconhecido.\n");
         return -1;
     }
-
-    free(com_fifo);
     return 0;
 }

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "orchestrator.h": "c",
+        "stat.h": "c",
+        "stdlib.h": "c"
+    }
+}
