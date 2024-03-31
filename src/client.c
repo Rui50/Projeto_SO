@@ -9,7 +9,7 @@
 #include "../include/client.h"
 
 #define MAX_SIZE 500
-#define MFIFO "tmp/mfifo"
+#define MFIFO "../tmp/mfifo"
 
 int main(int argc, char **argv){
 
@@ -19,7 +19,7 @@ int main(int argc, char **argv){
     }
 
     // vai servir como "uid do cliente"
-    int mypid = getpid(); 
+    int mypid = getpid();
     
     char data_buffer[MAX_SIZE];
 
@@ -40,7 +40,7 @@ int main(int argc, char **argv){
             strcat(exec_args, argv[i]);
         }
         
-        printf("Opening FIFO for writing\n");
+        printf("Opening FIFO for the request\n");
         int fd = open(MFIFO, O_WRONLY);
         if(fd == -1){
             perror("Error opening FIFO for writing");
@@ -51,7 +51,7 @@ int main(int argc, char **argv){
         // comando;exec_time;program_to_execute;modo;exec_args
 
         // enviar tambme o seu pid para abrir o fifo de retorno?
-        snprintf(data_buffer, MAX_SIZE, "execute;%s;%s;%s;%s", exec_time, mode, program, exec_args);
+        snprintf(data_buffer, MAX_SIZE, "%d;execute;%s;%s;%s;%s", mypid,exec_time, mode, program, exec_args);
         printf("Sending request: %s\n", data_buffer);
         if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
             perror("Error writing to FIFO");
@@ -63,6 +63,23 @@ int main(int argc, char **argv){
 
     else if (strcmp(argv[1], "status") == 0) {
         printf("Solicitando status das tarefas ao servidor...\n");
+
+        // abrir o meu fifo para request do status
+        int fd = open(MFIFO, O_WRONLY);
+        if(fd == -1){
+            perror("Error opening FIFO for writing");
+            return -1;
+        }
+
+        // abrir fifo para receber o status
+        char fifoName[12];
+        sprintf(fifoName, "fifo_%d", mypid);
+
+        int fd2 = open(MFIFO, O_RDONLY);
+        if(fd2 == -1){
+            perror("Error opening FIFO for writing");
+            return -1;
+        }
     }
     
     else {

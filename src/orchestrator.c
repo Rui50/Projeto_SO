@@ -10,24 +10,44 @@
 #include "../include/orchestrator.h"
 
 #define MAX_SIZE 500
-#define MFIFO "tmp/mfifo"
+#define MFIFO "../tmp/mfifo"
 
 struct request{
     int uid; // identificador unico da task
-    char *output;    
+    char *output_path;    
 };
 
-int parseRequest(){
-    return 1;
+void execute(char *pid, char *request){
+    printf("EXCUTE SENT\n");
 }
 
-int genTaskUID(){
-    return 1;
+void status(char *pid, char *request){
+    char fifoName[12];
+    printf(fifoName, "fifo_%d", pid);
+
+    // função que pega nas tarefas da queue etc 
 }
+
+void parseRequest(char *request){
+
+    char *pid = strsep(&request, ";");
+    char *mode = strsep(&request, ";");
+
+    if(strcmp(mode, "execute") == 0){
+        execute(pid, request);
+    }
+    else if (strcmp(mode, "status") == 0){
+        status(pid, request);
+    }
+    else{
+        printf("Unknown Type of Request");
+    }
+}
+
+
 
 // vai ter um fifo principal que lida com os requests
 // outro fifo para cada cliente
-
 int main(int argc, char **argv){
     /*if(argc != 4){
         printf("Usage:  ./orchestrator output_folder parallel-tasks sched-policy");
@@ -55,6 +75,7 @@ int main(int argc, char **argv){
     while((bytesRead = read(fd, request, MAX_SIZE - 1)) != -1){
         if(bytesRead > 0){
             printf("Received: %s\n", request);
+            parseRequest(request);
         }
     }
     if (errno != EAGAIN) {
