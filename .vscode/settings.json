@@ -3,6 +3,8 @@
         "orchestrator.h": "c",
         "stat.h": "c",
         "stdlib.h": "c",
-        "client.h": "c"
+        "client.h": "c",
+        "taskqueue.h": "c",
+        "stdio.h": "c"
     }
 }
