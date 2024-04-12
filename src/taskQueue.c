@@ -19,6 +19,10 @@ void initQueue(TaskPriorityQueue *queue) {
     queue->size = 0;
 }
 
+int isQueueEmpty(TaskPriorityQueue *queue) {
+    return queue->size == 0;
+}
+
 void bubbleUp (int i, TaskPriorityQueue *queue){
     while(i > 0 && queue->tasks[i]->time < queue->tasks[parent(i)]->time){
         swap(queue, i, parent(i));

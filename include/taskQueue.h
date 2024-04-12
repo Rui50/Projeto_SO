@@ -14,5 +14,6 @@ void initQueue(TaskPriorityQueue *queue);
 int addTask(TaskPriorityQueue *queue, TASK *task);
 TASK *getNextTask(TaskPriorityQueue *queue);
 void printQueueTimes(TaskPriorityQueue *queue);
+int isQueueEmpty(TaskPriorityQueue *queue);
 
 #endif

@@ -47,6 +47,19 @@ int main(int argc, char **argv){
             return -1;
         }
 
+        // Fazer já aqui o fifo de retorno por senão o server pode tentar abrir antes de ser criado
+
+        // dados fifo retorno
+        char fifoName[12];
+        sprintf(fifoName, "fifo_%d", mypid);
+        char uidTask[10];
+
+
+        // criar fifo de return
+        if (mkfifo(fifoName, 0660) == -1) {
+            perror("Failed to create main FIFO: \n");
+        }
+
         // format
         // comando;exec_time;program_to_execute;modo;exec_args
 
@@ -56,7 +69,27 @@ int main(int argc, char **argv){
         if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
             perror("Error writing to FIFO");
         }
+        // abaixo disto tudo dentro de else? prevenir caso de write falhar e abrir fifo de retorno
         close(fd);
+
+        printf("FIFO RETORNO: %s\n", fifoName);
+        
+        // abrir fifo para receber o status
+        int fd2 = open(fifoName, O_RDONLY);
+        if(fd2 == -1){
+            perror("Error opening FIFO for writing");
+            return -1;
+        }
+
+        ssize_t bytes_read;
+        if((bytes_read = read(fd2, uidTask, sizeof(uidTask))) > 0){
+            printf("UID RECEIVED: %s\n", uidTask);
+        }
+
+        // apagar o fifo
+        if (unlink(fifoName) == -1){
+            perror("Erro a apagar o fifo");
+        }
 
         free(exec_args);
     }
@@ -70,16 +103,28 @@ int main(int argc, char **argv){
             perror("Error opening FIFO for writing");
             return -1;
         }
+        
+        // mensagem de status 
+
+        snprintf(data_buffer, MAX_SIZE, "%d;status;", mypid); // leva o ; devido ao parsing feito no server
+
+        // enviar status msg
+        if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
+            perror("Error writing to FIFO");
+        }
+        close(fd);
+
 
         // abrir fifo para receber o status
         char fifoName[12];
         sprintf(fifoName, "fifo_%d", mypid);
-
-        int fd2 = open(MFIFO, O_RDONLY);
+        
+        /*
+        int fd2 = open(fifoName, O_RDONLY);
         if(fd2 == -1){
             perror("Error opening FIFO for writing");
             return -1;
-        }
+        }*/
     }
     
     else {

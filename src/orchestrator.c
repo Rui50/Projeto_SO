@@ -9,8 +9,9 @@
 #include "../include/orchestrator.h"
 #include "../include/taskQueue.h"
 
-#define MAX_SIZE 500
+#define MAX_SIZE 1000
 #define MFIFO "../tmp/mfifo"
+#define TASKS_FILE "tasks.txt"
 
 int uid = 1;
 
@@ -22,10 +23,18 @@ TASK *createTask(char *pid, char *request){
     char *program = strsep(&request, ";");
     char *args = strsep(&request, ";");
 
+    task->uid = uid;
+    uid++;
     task->pid = strdup(pid);    
     task->time = strtod(time, NULL);
     task->program = strdup(program);
     task->args = strdup(args);
+
+    // output path
+    /*char *file_extension = ".txt";
+    char *output_path = strdup(program);
+    strcat(output_path, file_extension);
+    task->output_path = program;*/
 
     printf("Task request PID: %s\n", task->pid);
     printf("Time: %f\n", task->time);
@@ -41,9 +50,33 @@ void execute(char *pid, char *request){
 
 void status(char *pid, char *request){
     char fifoName[12];
-    sprintf(fifoName, "fifo_%d", pid);
+    sprintf(fifoName, "fifo_%s", pid);
 
     // função que pega nas tarefas da queue etc 
+}
+
+void returnIdToClient(char *pid, int uid){
+    char fifoName[12];
+    char data_buffer[10];
+    sprintf(fifoName, "fifo_%s", pid);
+    printf("RETURN FIFO = %s\n", fifoName);
+
+
+    int fd = open(fifoName, O_WRONLY);
+    if (fd == -1){
+        perror("Error opening return fifo: \n");
+    }
+
+    // mensagem com o uid
+    snprintf(data_buffer, sizeof(data_buffer), "%d", uid);
+
+    // enviar id
+    if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
+        perror("Error writing to FIFO");
+    }
+
+    close(fd);
+
 }
 
 void parseRequest(char *request, TaskPriorityQueue *queue){
@@ -55,6 +88,7 @@ void parseRequest(char *request, TaskPriorityQueue *queue){
         int status = addTask(queue, newTask);
         if (status == 0){
             printf("TASK INSERTED INTO THE QUEUE\n");
+            returnIdToClient(pid, newTask->uid);
             printQueueTimes(queue);
         }
         else {
@@ -62,7 +96,14 @@ void parseRequest(char *request, TaskPriorityQueue *queue){
         }
     }
     else if (strcmp(mode, "status") == 0){
-        status(pid, request);
+        printf("STATUS COMMAND EXECUTED\n");
+        if (queue->size > 0) {
+            TASK *test = getNextTask(queue);
+            double timer = test->time;
+            printf("TIMER REMOVER = %f\n", timer);
+        } else {
+            printf("The queue is empty.\n");
+        }
     }
     else{
         printf("Unknown Type of Request\n");
@@ -100,13 +141,34 @@ int main(int argc, char **argv){
     if(fd == -1){
         perror("Error error opening FIFO!\n");
     }
+    // filho vai tratar das executions, pai dos requests
 
-    while((bytesRead = read(fd, request, MAX_SIZE - 1)) != -1){
-        if(bytesRead > 0){
-            printf("Received: %s\n", request);
-            parseRequest(request, &queue);
+    pid_t pid = fork();
+
+    if (pid == 0){
+        while (1){
+            printf("SIZE %d\n", queue.size);
+            if (!isQueueEmpty(&queue)) {
+                TASK *t = getNextTask(&queue);
+                if(t != NULL){ // erro
+                    printf("t-PROGRAM = %s\n", t->program);
+                }
+                else{
+                    printf("null task\n");
+                }
+            }
+            sleep(1);
         }
     }
+    else{
+        while((bytesRead = read(fd, request, MAX_SIZE - 1)) != -1){
+            if(bytesRead > 0){
+                printf("Received: %s\n", request);
+                parseRequest(request, &queue);
+            }
+        }
+        close(fd);
+    }
 
-    close(fd);
+    return 0;
 }
