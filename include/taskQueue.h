@@ -1,7 +1,7 @@
 #ifndef TASKQUEUE_H
 #define TASKQUEUE_H
 
-#define MAX_SIZE 1000
+#define MAX_SIZE 1024
 
 #include "../include/orchestrator.h"
 

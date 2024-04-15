@@ -34,10 +34,11 @@ int main(int argc, char **argv){
         char *exec_args =  malloc(MAX_SIZE);
         exec_args[0] = '\0'; 
 
-        for(int i = 5; i < argc; i++){
-            // espaço para separar argumentos
-            if(i != 5) strcat(exec_args, " ");
+        for (int i = 5; i < argc; i++) {
             strcat(exec_args, argv[i]);
+            if (i < argc - 1) {
+                strcat(exec_args, " ");
+            }
         }
         
         printf("Opening FIFO for the request\n");

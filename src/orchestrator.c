@@ -5,11 +5,11 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include "../include/orchestrator.h"
 #include "../include/taskQueue.h"
 
-#define MAX_SIZE 1000
 #define MFIFO "../tmp/mfifo"
 #define TASKS_FILE "tasks.txt"
 
@@ -21,20 +21,14 @@ TASK *createTask(char *pid, char *request){
     char *time = strsep(&request, ";");
     char *mode = strsep(&request, ";");
     char *program = strsep(&request, ";");
-    char *args = strsep(&request, ";");
+    char *args = request;
 
     task->uid = uid;
     uid++;
     task->pid = strdup(pid);    
     task->time = strtod(time, NULL);
     task->program = strdup(program);
-    task->args = strdup(args);
-
-    // output path
-    /*char *file_extension = ".txt";
-    char *output_path = strdup(program);
-    strcat(output_path, file_extension);
-    task->output_path = program;*/
+    task->args = args ? strdup(args) : strdup(""); // caso de nao ter argumentos
 
     printf("Task request PID: %s\n", task->pid);
     printf("Time: %f\n", task->time);
@@ -44,8 +38,74 @@ TASK *createTask(char *pid, char *request){
     return task;
 }
 
-void execute(char *pid, char *request){
+void executeSingleTask(char *requester_pid, TASK *task, char *outputs_folder){
+    struct timeval start_time, end_time;
+    gettimeofday(&start_time, NULL);
+    
+    pid_t pid = fork();
 
+    if(pid == 0){
+
+        // ouput path com base no uid da task
+
+        char output_path[MAX_SIZE];
+        snprintf(output_path, sizeof(output_path), "../%s/task_%d.txt", outputs_folder, task->uid);
+
+        int outputFD = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0660);
+        if(outputFD == -1){
+            perror("Erro a criar ficheiro de output: ");
+        }
+
+        // redirect stdout para o output_path
+        int out = dup2(outputFD, STDOUT_FILENO);
+        if (out == -1){
+            perror("Erro dup stdout: ");
+            close(outputFD);
+        }
+
+        // redirect stderr para o output_path
+        int err = dup2(outputFD, STDERR_FILENO);
+        if (err == -1){
+            perror("Erro dup stderr: ");
+            close(outputFD);
+        }
+
+
+        execlp(task->program, task->program, task->args, NULL);
+        _exit(0);
+    }
+    else{
+        int status;
+        waitpid(pid, &status, 0);
+
+        gettimeofday(&end_time, NULL);
+
+        long seconds = end_time.tv_sec - start_time.tv_sec;
+        long useconds = end_time.tv_usec - start_time.tv_usec;
+        double elapsed = seconds + useconds*1e-6;
+
+        printf("TIME TO EXECUTE: %f\n", elapsed);
+
+        // Abrir/criar os logs das tasks executadas no output_folder
+        char log_file_path[1024];
+        snprintf(log_file_path, sizeof(log_file_path), "../%s/task_logs.txt", outputs_folder);
+        printf("LOG FILES PATH %s\n", log_file_path);
+        int fd = open(log_file_path, O_WRONLY | O_CREAT | O_APPEND, 0666);
+        if (fd == -1) {
+            perror("Failed to open log file: ");
+            return;
+        }
+
+        // String log
+        char log_entry[256];
+        int log_entry_size = snprintf(log_entry, sizeof(log_entry), "Task ID: %d, Time: %f seconds\n", task->uid, elapsed);
+
+        if (write(fd, log_entry, log_entry_size) != log_entry_size) {
+            perror("Failed to write log");
+        }
+
+        close(fd);
+    }
 }
 
 void status(char *pid, char *request){
@@ -111,10 +171,108 @@ void parseRequest(char *request, TaskPriorityQueue *queue){
 }
 
 
+void executeTask(TASK *task, char *outputs_folder) {
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+        executeSingleTask(task->pid, task, outputs_folder);
+        exit(0);
+    }
+    // Pai nao espera | evitar espera no ciclo
+}
 
 // vai ter um fifo principal que lida com os requests
 // outro fifo para cada cliente
+
+
 int main(int argc, char **argv){
+    if(argc != 4){
+        printf("Usage:  ./orchestrator output_folder parallel-tasks sched-policy\n");
+        return 1;
+    }
+
+    // Initiate vars
+    TaskPriorityQueue queue;
+    char request[MAX_SIZE];
+    ssize_t bytesRead;
+    ssize_t bytesReadPIPE;
+
+    //iniciar a queue
+    initQueue(&queue);
+
+    // data parsing
+    char *outputs_folder = argv[1];
+    int parallel_taks = atoi(argv[2]);
+    //int sched_policy = atoi(argv[3]);
+
+    if (mkfifo(MFIFO, 0660) == -1) {
+        perror("Failed to create main FIFO: \n");
+    }
+
+    int fd = open(MFIFO, O_RDONLY);
+    if (fd == -1) {
+        perror("Error opening FIFO: \n");
+        return 1;
+    }
+
+    int fdpipe[2];
+    if (pipe(fdpipe) == -1) {
+        perror("Pipe failed: \n");
+        return 1;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("Fork failed: \n");
+        return 1;
+    }
+
+    if (pid == 0) { // Child process
+        close(fdpipe[0]); // Close read end in child
+    
+        char request[MAX_SIZE];
+        while (1) {
+            ssize_t bytesRead = read(fd, request, MAX_SIZE - 1);
+            if (bytesRead > 0) {
+                request[bytesRead] = '\0'; // por causa do "lixo"
+                printf("Received request: %s\n", request);
+                write(fdpipe[1], request, bytesRead + 1);
+            }
+
+        }
+        close(fd);
+        close(fdpipe[1]);
+        exit(0);
+    } else { 
+        // Processo Pai
+        // Vai receber os requests que o filho leu e verificar se existem elementos na queue
+
+        close(fdpipe[1]); // Fechar escrita do pipe
+
+        char buffer[MAX_SIZE];
+        while (1) {
+            ssize_t bytesRead = read(fdpipe[0], buffer, MAX_SIZE);
+            if (bytesRead > 0) {
+                printf("Received request from child: %s\n", buffer);
+                parseRequest(buffer, &queue);
+            } 
+
+            // verificar se a queue tem mais elementos
+            if (!isQueueEmpty(&queue)) {
+                TASK *task = getNextTask(&queue);
+                printf("Processing task: %s\n", task->program);
+                executeTask(task, outputs_folder);
+            }
+        }
+
+        close(fd);
+        close(fdpipe[0]);
+    }
+
+    return 0;
+}
+
+
+/*int main(int argc, char **argv){
     //if(argc != 4){
     //    printf("Usage:  ./orchestrator output_folder parallel-tasks sched-policy");
     //}
@@ -171,4 +329,4 @@ int main(int argc, char **argv){
     }
 
     return 0;
-}
+}*/
