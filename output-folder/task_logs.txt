@@ -1,0 +1,8 @@
+Task ID: 1, Time: 22.866047 seconds
+Task ID: 1, Time: 22.362028 seconds
+Task ID: 1, Time: 22.726899 seconds
+Task ID: 2, Time: 22.719422 seconds
+Task ID: 3, Time: 22.872281 seconds
+Task ID: 6, Time: 10.001492 seconds
+Task ID: 4, Time: 22.765920 seconds
+Task ID: 5, Time: 45.965632 seconds

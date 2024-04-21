@@ -177,7 +177,7 @@ void executeTask(TASK *task, char *outputs_folder) {
         executeSingleTask(task->pid, task, outputs_folder);
         exit(0);
     }
-    // Pai nao espera | evitar espera no ciclo
+    // Pai nao espera | evitar espera no ciclo | temos de dar fix
 }
 
 // vai ter um fifo principal que lida com os requests
@@ -193,7 +193,6 @@ int main(int argc, char **argv){
     // Initiate vars
     TaskPriorityQueue queue;
     char request[MAX_SIZE];
-    ssize_t bytesRead;
     ssize_t bytesReadPIPE;
 
     //iniciar a queue
@@ -233,11 +232,14 @@ int main(int argc, char **argv){
         while (1) {
             ssize_t bytesRead = read(fd, request, MAX_SIZE - 1);
             if (bytesRead > 0) {
-                request[bytesRead] = '\0'; // por causa do "lixo"
-                printf("Received request: %s\n", request);
+                request[bytesRead] = '\0';
                 write(fdpipe[1], request, bytesRead + 1);
+            } else {
+                // No data read, send a heartbeat
+                const char* heartbeat = "HEARTBEAT";
+                write(fdpipe[1], heartbeat, strlen(heartbeat) + 1);
+                sleep(1); // Sleep for a bit to prevent tight looping
             }
-
         }
         close(fd);
         close(fdpipe[1]);
@@ -250,16 +252,22 @@ int main(int argc, char **argv){
 
         char buffer[MAX_SIZE];
         while (1) {
+            // como pai desbloquear do read
+            // so vai executar quando ler alguma coisa, senao fica la preso
             ssize_t bytesRead = read(fdpipe[0], buffer, MAX_SIZE);
             if (bytesRead > 0) {
+                if (strcmp(buffer, "HEARTBEAT") == 0) {
+                    // Just a heartbeat, nothing to do
+                    continue;
+                }
                 printf("Received request from child: %s\n", buffer);
                 parseRequest(buffer, &queue);
-            } 
+            }
 
-            // verificar se a queue tem mais elementos
+            // Check and process tasks from the queue
             if (!isQueueEmpty(&queue)) {
                 TASK *task = getNextTask(&queue);
-                printf("Processing task: %s\n", task->program);
+                printf("EXECUTING PROGRAM %s\n", task->program);
                 executeTask(task, outputs_folder);
             }
         }
