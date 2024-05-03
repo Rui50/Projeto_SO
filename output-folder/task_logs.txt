@@ -1,8 +1,70 @@
-Task ID: 1, Time: 22.866047 seconds
-Task ID: 1, Time: 22.362028 seconds
-Task ID: 1, Time: 22.726899 seconds
-Task ID: 2, Time: 22.719422 seconds
-Task ID: 3, Time: 22.872281 seconds
-Task ID: 6, Time: 10.001492 seconds
-Task ID: 4, Time: 22.765920 seconds
-Task ID: 5, Time: 45.965632 seconds
+Task ID: 1, Time: 5.002207 seconds, Program: ./void
+Task ID: 2, Time: 5.001182 seconds, Program: ./void
+Task ID: 3, Time: 5.001194 seconds, Program: ./void
+Task ID: 1, Time: 10.001649 seconds, Program: ./void
+Task ID: 2, Time: 10.000963 seconds, Program: ./void
+Task ID: 3, Time: 10.001322 seconds, Program: ./void
+Task ID: 4, Time: 10.001252 seconds, Program: ./void
+Task ID: 5, Time: 10.001258 seconds, Program: ./void
+Task ID: 7, Time: 10.001309 seconds, Program: ./void
+Task ID: 10, Time: 10.001282 seconds, Program: ./void
+Task ID: 9, Time: 10.001188 seconds, Program: ./void
+Task ID: 8, Time: 10.001339 seconds, Program: ./void
+Task ID: 6, Time: 10.001132 seconds, Program: ./void
+Task ID: 1, Time: 10.001696 seconds, Program: ./void
+Task ID: 2, Time: 10.000712 seconds, Program: ./void
+Task ID: 3, Time: 2.001065 seconds, Program: ./void
+Task ID: 4, Time: 2.000824 seconds, Program: ./void
+Task ID: 1, Time: 10.006055 seconds, Program: ./void
+Task ID: 2, Time: 10.001350 seconds, Program: ./void
+Task ID: 3, Time: 10.001266 seconds, Program: ./void
+Task ID: 4, Time: 10.001228 seconds, Program: ./void
+Task ID: 1, Time: 10.001694 seconds, Program: ./void
+Task ID: 2, Time: 10.001015 seconds, Program: ./void
+Task ID: 3, Time: 10.000872 seconds, Program: ./void
+Task ID: 4, Time: 10.000991 seconds, Program: ./void
+Task ID: 1, Time: 10.006031 seconds, Program: ./void
+Task ID: 2, Time: 10.001220 seconds, Program: ./void
+Task ID: 3, Time: 10.001062 seconds, Program: ./void
+Task ID: 4, Time: 10.001002 seconds, Program: ./void
+Task ID: 1, Time: 5.001804 seconds, Program: ./void
+Task ID: 2, Time: 5.001470 seconds, Program: ./void
+Task ID: 3, Time: 10.001150 seconds, Program: ./void
+Task ID: 4, Time: 10.001091 seconds, Program: ./void
+Task ID: 1, Time: 10.001404 seconds, Program: ./void
+Task ID: 2, Time: 2.000716 seconds, Program: ./void
+Task ID: 3, Time: 2.000743 seconds, Program: ./void
+Task ID: 4, Time: 2.000903 seconds, Program: ./void
+Task ID: 1, Time: 10.001527 seconds, Program: ./void
+Task ID: 2, Time: 10.000804 seconds, Program: ./void
+Task ID: 3, Time: 10.001010 seconds, Program: ./void
+Task ID: 4, Time: 10.000815 seconds, Program: ./void
+Task ID: 1, Time: 10.001651 seconds, Program: ./void
+Task ID: 2, Time: 10.000814 seconds, Program: ./void
+Task ID: 3, Time: 10.000887 seconds, Program: ./void
+Task ID: 4, Time: 10.000752 seconds, Program: ./void
+Task ID: 6, Time: 10.000883 seconds, Program: ./void
+Task ID: 7, Time: 10.000877 seconds, Program: ./void
+Task ID: 5, Time: 10.000752 seconds, Program: ./void
+Task ID: 1, Time: 2.001852 seconds, Program: ./void
+Task ID: 1, Time: 2.001576 seconds, Program: ./void
+Task ID: 2, Time: 2.000738 seconds, Program: ./void
+Task ID: 3, Time: 2.000843 seconds, Program: ./void
+Task ID: 4, Time: 2.000812 seconds, Program: ./void
+Task ID: 1, Time: 2.001980 seconds, Program: ./void
+Task ID: 2, Time: 2.001064 seconds, Program: ./void
+Task ID: 3, Time: 2.006104 seconds, Program: ./void
+Task ID: 4, Time: 2.001000 seconds, Program: ./void
+Task ID: 5, Time: 2.000869 seconds, Program: ./void
+Task ID: 1, Time: 2.001733 seconds, Program: ./void
+Task ID: 1, Time: 4.001846 seconds, Program: ./void
+Task ID: 2, Time: 4.001211 seconds, Program: ./void
+Task ID: 3, Time: 4.001418 seconds, Program: ./void
+Task ID: 4, Time: 4.001327 seconds, Program: ./void
+Task ID: 1, Time: 4.001820 seconds, Program: ./void
+Task ID: 1, Time: 4.006130 seconds, Program: ./void
+Task ID: 2, Time: 4.001115 seconds, Program: ./void
+Task ID: 3, Time: 4.001702 seconds, Program: ./void
+Task ID: 4, Time: 4.001382 seconds, Program: ./void
+Task ID: 6, Time: 4.001256 seconds, Program: ./void
+Task ID: 5, Time: 4.001057 seconds, Program: ./void

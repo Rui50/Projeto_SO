@@ -1,5 +1,5 @@
-#ifndef TASKQUEUE_H
-#define TASKQUEUE_H
+#ifndef TASK_H
+#define TASKQ_H
 
 #define MAX_SIZE 1024
 

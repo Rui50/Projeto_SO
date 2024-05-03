@@ -1,9 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../include/taskQueue.h"
-
-#define MAX_SIZE 1000
+#include "../include/task.h"
 
 int left(int i) { return 2 * i + 1; }
 int right(int i) { return 2 * i + 2; }
