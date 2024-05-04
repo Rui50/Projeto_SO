@@ -1,19 +1,21 @@
 #ifndef TASK_H
-#define TASKQ_H
+#define TASK_H
 
-#define MAX_SIZE 1024
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "../include/orchestrator.h"
+typedef struct task {
+    int uid;
+    char *type; // tipo, status, execute
+    double time; // time requested | will determine priority
+    char *execution_mode;
+    char *pid; // requester pid
+    char *program;
+    char *args; //opc
+} TASK;
 
-typedef struct taskQueue {
-  TASK *tasks[MAX_SIZE];
-  int size;
-} TaskPriorityQueue;
-
-void initQueue(TaskPriorityQueue *queue);
-int addTask(TaskPriorityQueue *queue, TASK *task);
-TASK *getNextTask(TaskPriorityQueue *queue);
-void printQueueTimes(TaskPriorityQueue *queue);
-int isQueueEmpty(TaskPriorityQueue *queue);
+TASK *createTask(char *pid, char *request, int *uid);
+void freeTask(TASK **task);
 
 #endif

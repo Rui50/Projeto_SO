@@ -8,49 +8,11 @@
 #include <sys/time.h>
 
 #include "../include/orchestrator.h"
-#include "../include/task.h"
+#include "../include/requests.h"
+#include "../include/execute.h"
 
 #define MFIFO "../tmp/mfifo"
 #define TASKS_FILE "tasks.txt"
-
-//int uid = 1;
-//TASK **running_tasks;
-
-void freeTask(TASK **task) {
-    if (task == NULL || *task == NULL) return;
-
-    free((*task)->pid);
-    free((*task)->program);
-    free((*task)->execution_mode);
-    free((*task)->args);
-
-    free(*task);
-}
-// INITIAL INTERACTION FUNCTIONS
-/**
- * 
- * 
-*/
-TASK *createTask(char *pid, char *request, int *uid){
-    TASK *task = (TASK*)malloc(sizeof(TASK));
-
-    char *time = strsep(&request, ";");
-    char *mode = strsep(&request, ";");
-    char *program = strsep(&request, ";");
-    char *args = request;
-
-    task->uid = ++(*uid);
-    printf("New Task UID: %d",task->uid);
-    task->pid = strdup(pid);    
-    task->time = strtod(time, NULL);
-    task->program = strdup(program);
-    task->execution_mode = strdup(mode);
-    task->args = args ? strdup(args) : strdup(""); // caso de nao ter argumentos
-
-    printf("Task created for program: %s\n", task->program);
-
-    return task;
-}
 
 void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, int *uid, char *output_folder){
 
@@ -61,6 +23,7 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
 
     if(strcmp(mode, "execute") == 0){
         TASK *newTask = createTask(pid, request, uid);
+        printf("task time after creating: %f\n", newTask->time);
         int status = addTask(queue, newTask);
         if (status == 0){
             //printf("TASK INSERTED INTO THE QUEUE\n");
@@ -94,8 +57,6 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
 
                     freeTask(&running_tasks[i]);
                     running_tasks[i] = NULL;
-
-
                 }
             }
         }
@@ -109,10 +70,7 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
 void returnIdToClient(char *pid, int uid){
     char fifoName[12];
     char data_buffer[10];
-    //printf("returning uid should be: %d\n", &uid)
     sprintf(fifoName, "fifo_%s", pid);
-    //printf("RETURN FIFO = %s\n", fifoName);
-
 
     int fd = open(fifoName, O_WRONLY);
     if (fd == -1){
@@ -126,9 +84,7 @@ void returnIdToClient(char *pid, int uid){
     if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
         perror("Error writing to FIFO");
     }
-
     close(fd);
-
 }
 
 void sendStatusToClient(char *pid, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder) {
@@ -163,24 +119,36 @@ void sendStatusToClient(char *pid, TaskPriorityQueue *queue, TASK **running_task
         }
     }
 
-    // taefas acabadas
-    printf("output_folder %s\n", output_folder);
+    // tarefas acabadas
     char log_file_path[1024];
     snprintf(log_file_path, sizeof(log_file_path), "../%s/task_logs.txt", output_folder);
-    printf("path: %s\n", log_file_path);
     int outputfd = open(log_file_path, O_RDONLY);
 
-    char buffer[1024];
+    LOG log;
+    ssize_t bytesRead;
 
-    int bytesRead = read(output_folder, buffer, sizeof(buffer));
-
-    printf("%d bytes read!\n", bytesRead);
-    printf("File Contents: %s\n", buffer);
-
-    close(outputfd);
+    while ((bytesRead = read(outputfd, &log, sizeof(LOG))) == sizeof(LOG)) {
+        char taskDetails[512];
+        snprintf(taskDetails, sizeof(taskDetails), "%d %f %s\n", log.task_uid, log.time_to_execute, log.program_name);
+        strcat(completed, taskDetails);
+    }
 
     snprintf(messageBUFFER, MAX_SIZE, "%s\n%s\n%s", executing, scheduled, completed);
 
+    char fifoName[12];
+    sprintf(fifoName, "fifo_%s", pid);
+
+    int fd = open(fifoName, O_WRONLY);
+    if (fd == -1){
+        perror("Error opening return fifo: \n");
+    }
+
+    if(write(fd, messageBUFFER, strlen(messageBUFFER)) == -1){
+        perror("Error writing to FIFO");
+    }
+
+    close(fd);
+    
     printf("%s", messageBUFFER);
 }
 
@@ -198,185 +166,6 @@ void sendTerminatedTask(TASK *terminatedTask, pid_t pid){
     }
 
     close(fd);
-}
-
-void executePipelineTask(char *requester_pid, TASK *task, char *outputs_folder){
-    
-    char output_path[MAX_SIZE];
-    snprintf(output_path, sizeof(output_path), "../%s/task_%d.txt", outputs_folder, task->uid);
-
-    int outputFD = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0660);
-    if(outputFD == -1){
-        perror("Erro a criar ficheiro de output: ");
-    }
-
-    // redirect stdout para o output_path
-    int out = dup2(outputFD, STDOUT_FILENO);
-    if (out == -1){
-        perror("Erro dup stdout: ");
-        close(outputFD);
-    }
-
-    // redirect stderr para o output_path
-    int err = dup2(outputFD, STDERR_FILENO);
-    if (err == -1){
-        perror("Erro dup stderr: ");
-        close(outputFD);
-    }
-    
-    
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
-    //preciso de função para obter numero de tasks a executar
-    int num_tasks = 0;
-
-    int pipes[num_tasks-1][2];
-
-    pid_t pid;
-
-    for(int i = 0; i < num_tasks; i++){
-        
-        //primeira task
-        if(i == 0){
-            pipe(pipes[i]);
-
-            pid = fork();
-
-            if(pid == 0){
-                //fechar leitura
-                close(pipes[i][0]);
-                dup2(pipes[i][1], 1); //para stdout
-
-                //dup2(err, 2);
-                //close(err);
-                // executar, temos que fazer o parsing da linha antes por causa dos parametros
-            }
-            close(pipes[i][1]);
-            //fechar sderr    
-        }
-
-        // tasks intermediarias
-        else if(i != num_tasks - 1) {
-            pipe(pipes[i]);
-
-            pid = fork();
-
-            if(pid == 0){
-                //fechar leitura
-                close(pipes[i][0]);
-                dup2(pipes[i-1][0], 0);
-                close(pipes[i-1][0]);
-
-                dup2(pipes[i][1],1);
-                close(pipes[i][1]);
-
-                //dup2(err,2);
-                //close(err);
-
-                //executar
-            }
-
-            close(pipes[i-1][0]);
-            close(pipes[i][1]);
-            //close(err);
-        }
-
-        if(i == num_tasks - 1){
-            dup2(pipes[i-1][0],0);
-            close(pipes[i-1][0]);
-
-            //dup2(out,1);
-            //close(out);
-
-            //dup2(err,2);
-            //close(err);
-
-            // executar
-        }
-
-        close(pipes[i-1][0]);
-        //close(out)
-        //close(err)
-    }
-
-    //falta waits etc
-
-}
-
-void executeSingleTask(char *requester_pid, TASK *task, char *outputs_folder, pid_t pid_to_collect){
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-    printf("pid para recollha %d\n", pid_to_collect);
-    
-    pid_t pid = fork();
-
-    if(pid == 0){
-
-        // ouput path com base no uid da task
-
-        char output_path[MAX_SIZE];
-        snprintf(output_path, sizeof(output_path), "../%s/task_%d.txt", outputs_folder, task->uid);
-
-        int outputFD = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0660);
-        if(outputFD == -1){
-            perror("Erro a criar ficheiro de output: ");
-        }
-
-        // redirect stdout para o output_path
-        int out = dup2(outputFD, STDOUT_FILENO);
-        if (out == -1){
-            perror("Erro dup stdout: ");
-            close(outputFD);
-        }
-
-        // redirect stderr para o output_path
-        int err = dup2(outputFD, STDERR_FILENO);
-        if (err == -1){
-            perror("Erro dup stderr: ");
-            close(outputFD);
-        }
-
-        execlp(task->program, task->program, task->args, NULL);
-
-        close(out);
-        close(err);
-        _exit(0);
-    }
-    else{
-        int status;
-        waitpid(pid, &status, 0);
-
-        sendTerminatedTask(task, pid_to_collect);
-
-        gettimeofday(&end_time, NULL);
-
-        long seconds = end_time.tv_sec - start_time.tv_sec;
-        long useconds = end_time.tv_usec - start_time.tv_usec;
-        double elapsed = seconds + useconds*1e-6;
-
-        printf("TIME TO EXECUTE: %f\n", elapsed);
-
-        // Abrir/criar os logs das tasks executadas no output_folder
-        char log_file_path[1024];
-        snprintf(log_file_path, sizeof(log_file_path), "../%s/task_logs.txt", outputs_folder);
-        //printf("LOG FILES PATH %s\n", log_file_path);
-        int fd = open(log_file_path, O_WRONLY | O_CREAT | O_APPEND, 0666);
-        if (fd == -1) {
-            perror("Failed to open log file: ");
-            return;
-        }
-
-        // String log
-        char log_entry[256];
-        int log_entry_size = snprintf(log_entry, sizeof(log_entry), "Task ID: %d, Time: %f seconds, Program: %s\n", task->uid, elapsed, task->program);
-
-        if (write(fd, log_entry, log_entry_size) != log_entry_size) {
-            perror("Failed to write log");
-        }
-
-        close(fd);
-    }
 }
 
 
@@ -439,6 +228,23 @@ int main(int argc, char **argv){
         return 1;
     }
 
+
+    // para evitar a espera ativa
+    pid_t pid_block = fork();
+
+    if (pid_block == 0){
+        int fd_block = open(MFIFO, O_WRONLY);
+        if(fd_block == -1){
+            perror("Erro ao abrir o FAKE_FIFO");
+            exit(1);
+        }
+
+        while(1){
+            sleep(10);
+        }
+        _exit(0);
+    }
+
     ssize_t bytesread;
     char request[MAX_SIZE];
 
@@ -448,7 +254,7 @@ int main(int argc, char **argv){
         request[bytesread] = '\0';
         
         if (strlen(request) > 0){
-            printf("request received:  %s\n", request);
+            //printf("request received:  %s\n", request);
             parseRequest(request, &queue, running_tasks, parallel_tasks, &uid, outputs_folder);
         }
 

@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 
 #include "../include/client.h"
+#include "../include/task.h"
 
 #define MAX_SIZE 500
 #define MFIFO "../tmp/mfifo"
@@ -14,11 +15,10 @@
 int main(int argc, char **argv){
 
     if (argc < 2) {
-        printf("Usage: %s <command> [options]\n", argv[0]);
+        printf("Usage: execute <time> <-u|-p> \"<command>\"\n");
         return -1;
     }
 
-    // vai servir como "uid do cliente"
     int mypid = getpid();
     
     char data_buffer[MAX_SIZE];
@@ -30,7 +30,8 @@ int main(int argc, char **argv){
         char *mode = argv [3];
         char *program = argv[4];
 
-        // mudar se depois for preciso incluir o nome do programa para os comandos exec
+        printf("program %s\n", program);
+
         char *exec_args =  malloc(MAX_SIZE);
         exec_args[0] = '\0'; 
 
@@ -54,17 +55,18 @@ int main(int argc, char **argv){
         char fifoName[12];
         sprintf(fifoName, "fifo_%d", mypid);
         char uidTask[10];
-
+        char *pid_str = malloc(15 * sizeof(char));
+        snprintf(pid_str, 25, "%d", mypid);
 
         // criar fifo de return
         if (mkfifo(fifoName, 0660) == -1) {
             perror("Failed to create main FIFO: \n");
         }
 
-        // format
         // comando;exec_time;program_to_execute;modo;exec_args
 
-        // enviar tambme o seu pid para abrir o fifo de retorno?
+        // enviar tambme o seu pid para abrir o fifo de retorno
+
         snprintf(data_buffer, MAX_SIZE, "%d;execute;%s;%s;%s;%s", mypid,exec_time, mode, program, exec_args);
         printf("Sending request: %s\n", data_buffer);
         if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
@@ -104,6 +106,17 @@ int main(int argc, char **argv){
             perror("Error opening FIFO for writing");
             return -1;
         }
+
+
+        // abrir fifo para receber o status
+        char fifoName[12];
+        sprintf(fifoName, "fifo_%d", mypid);
+
+
+        // criar fifo de return
+        if (mkfifo(fifoName, 0660) == -1) {
+            perror("Failed to create main FIFO: \n");
+        }
         
         // mensagem de status 
 
@@ -114,18 +127,23 @@ int main(int argc, char **argv){
             perror("Error writing to FIFO");
         }
         close(fd);
-
-
-        // abrir fifo para receber o status
-        char fifoName[12];
-        sprintf(fifoName, "fifo_%d", mypid);
         
-        /*
+        
         int fd2 = open(fifoName, O_RDONLY);
         if(fd2 == -1){
             perror("Error opening FIFO for writing");
             return -1;
-        }*/
+        }
+
+        ssize_t bytes_read;
+        char databuffer[MAX_SIZE];
+
+        if((bytes_read = read(fd2, data_buffer, sizeof(data_buffer))) > 0){
+            printf("%s", data_buffer);
+        }
+
+        close(fd2);
+
     }
     
     else {

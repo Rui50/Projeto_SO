@@ -1,80 +1,34 @@
-#include <stdlib.h>
-#include <stdio.h>
-
 #include "../include/task.h"
+ 
+void freeTask(TASK **task) {
+    if (task == NULL || *task == NULL) return;
 
-int left(int i) { return 2 * i + 1; }
-int right(int i) { return 2 * i + 2; }
-int parent(int i) { return (i-1)/2; }
+    free((*task)->pid);
+    free((*task)->program);
+    free((*task)->execution_mode);
+    free((*task)->args);
 
-void swap(TaskPriorityQueue *queue, int a, int b){
-    TASK *temp = queue->tasks[a];
-    queue->tasks[a] = queue->tasks[b];
-    queue->tasks[b] = temp;
+    free(*task);
 }
 
-void initQueue(TaskPriorityQueue *queue) {
-    queue->size = 0;
-}
+TASK *createTask(char *pid, char *request, int *uid){
+    TASK *task = (TASK*)malloc(sizeof(TASK));
 
-int isQueueEmpty(TaskPriorityQueue *queue) {
-    return queue->size == 0;
-}
+    char *time = strsep(&request, ";");
+    char *mode = strsep(&request, ";");
+    char *program = strsep(&request, ";");
+    char *args = request;
 
-void bubbleUp (int i, TaskPriorityQueue *queue){
-    while(i > 0 && queue->tasks[i]->time < queue->tasks[parent(i)]->time){
-        swap(queue, i, parent(i));
-        i = parent(i);
-    }
-}
+    task->uid = ++(*uid);
+    printf("New Task UID: %d\n",task->uid);
+    task->pid = strdup(pid);    
+    task->time = strtod(time, NULL);
+    printf("TIME OF THE TASK: %f", task->time);
+    task->program = strdup(program);
+    task->execution_mode = strdup(mode);
+    task->args = args ? strdup(args) : strdup(""); // caso de nao ter argumentos
 
-void bubbleDown (int i, TaskPriorityQueue *queue){
-    int temp;
-
-    while (left(i) < queue->size){
-        if(right(i) < queue->size && queue->tasks[right(i)]->time < queue->tasks[left(i)]->time){
-            temp = right(i);
-        }
-        else{
-            temp = left(i);
-        }
-    
-
-        if(queue->tasks[temp]->time > queue->tasks[i]->time){
-            break;
-        }
-
-        swap(queue, i, temp);
-        i = temp;
-    }
-}
-
-int addTask(TaskPriorityQueue *queue, TASK *task){
-    if (queue->size == MAX_SIZE) return -1;
-
-    queue->tasks[queue->size] = task;
-    bubbleUp(queue->size, queue);
-    queue->size++;
-
-    return 0;
-}
-
-TASK *getNextTask(TaskPriorityQueue *queue){
-    TASK *task = queue->tasks[0];
-    queue->tasks[0] = queue->tasks[queue->size - 1];
-    queue->size--;
-    bubbleDown(0, queue);
+    printf("Task created for program: %s\n", task->program);
 
     return task;
-} 
-
-void printQueueTimes(TaskPriorityQueue *queue) {
-    printf("Queue Times: [");
-    for (int i = 0; i < queue->size; i++) {
-        printf("%f", queue->tasks[i]->time);
-        if (i < queue->size - 1) {
-            printf(", ");
-        }
-    }
-    printf("]\n");
 }
