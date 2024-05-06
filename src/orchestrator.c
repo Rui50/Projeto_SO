@@ -23,10 +23,8 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
 
     if(strcmp(mode, "execute") == 0){
         TASK *newTask = createTask(pid, request, uid);
-        printf("task time after creating: %f\n", newTask->time);
         int status = addTask(queue, newTask);
         if (status == 0){
-            //printf("TASK INSERTED INTO THE QUEUE\n");
             returnIdToClient(pid, newTask->uid);
             printQueueTimes(queue);
         }
@@ -36,7 +34,6 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
     }
     else if (strcmp(mode, "status") == 0){
         printf("STATUS COMMAND EXECUTED\n");
-        
         sendStatusToClient(pid, queue, running_tasks, parallel_tasks, output_folder);
     }
 
@@ -51,8 +48,6 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
                 if(running_tasks[i]->uid == task_uid){
                     printf("task uid %d removed from running tasks\n", running_tasks[i]->uid);
 
-                    // METER AQUI O PID CERTO
-                    printf("A recolher o pid %d\n", atoi(pid));
                     waitpid(atoi(pid), NULL, 0);
 
                     freeTask(&running_tasks[i]);
@@ -62,7 +57,7 @@ void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks,
         }
     }
     else{
-        printf("Unknown Type of Request\n");
+        printf("Request desconhecido\n");
     }
 }
 
@@ -77,7 +72,6 @@ void returnIdToClient(char *pid, int uid){
         perror("Error opening return fifo: \n");
     }
 
-    // mensagem com o uid
     snprintf(data_buffer, sizeof(data_buffer), "%d", uid);
 
     // enviar id
@@ -185,12 +179,20 @@ void checkTasks(TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tas
                     _exit(0);
                 }
                 else {
-                    // arranjar solucão para os pids
                     printf("Started executing program %s with uid %d\n", running_tasks[i]->program, running_tasks[i]->uid);
                 }
             }
-            else if(strcmp(running_tasks[i]->execution_mode, "-l") == 0){
-                printf("PIPELINE %d PROGRAM %s\n", running_tasks[i]->uid, running_tasks[i]->program);
+            else if(strcmp(running_tasks[i]->execution_mode, "-p") == 0){
+
+                pid_t pid = fork();
+                
+                if (pid == 0){
+                    executePipelineTask(running_tasks[i]->pid, running_tasks[i], output_folder, getpid());
+                    _exit(0);
+                }
+                else{
+                    printf("Started executing tasks %s with uid %d\n", running_tasks[i]->program, running_tasks[i]->uid);
+                }
             }
         }
     }
@@ -228,14 +230,13 @@ int main(int argc, char **argv){
         return 1;
     }
 
-
     // para evitar a espera ativa
     pid_t pid_block = fork();
 
     if (pid_block == 0){
         int fd_block = open(MFIFO, O_WRONLY);
         if(fd_block == -1){
-            perror("Erro ao abrir o FAKE_FIFO");
+            perror("Error opening pid for block");
             exit(1);
         }
 
@@ -254,7 +255,6 @@ int main(int argc, char **argv){
         request[bytesread] = '\0';
         
         if (strlen(request) > 0){
-            //printf("request received:  %s\n", request);
             parseRequest(request, &queue, running_tasks, parallel_tasks, &uid, outputs_folder);
         }
 

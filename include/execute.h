@@ -15,7 +15,7 @@
 #include "../include/taskQueue.h"
 #include "../include/requests.h"
 
-void executePipelineTask(char *requester_pid, TASK *task, char *outputs_folder);
+void executePipelineTask(char *requester_pid, TASK *task, char *outputs_folder, pid_t pid_to_collect);
 void executeSingleTask(char *requester_pid, TASK *task, char *outputs_folder, pid_t pid_to_collect);
 
 #endif
