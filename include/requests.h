@@ -7,7 +7,8 @@
 typedef enum{
     EXECUTE,
     STATUS,
-    TERMINATED_TASK
+    TERMINATED_TASK,
+    TERMINATED_STATUS
 } TYPE;
 
 typedef struct request {

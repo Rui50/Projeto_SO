@@ -30,12 +30,17 @@ void parseRequest(REQUEST *request, TaskPriorityQueue *queue, TASK **running_tas
             break;
 
         case STATUS:
-            sendStatusToClient(request->pid_requester, queue, running_tasks, parallel_tasks, output_folder);
+
+            pid_t pid = fork();
+
+            if (pid == 0){
+                sendStatusToClient(request->pid_requester, queue, running_tasks, parallel_tasks, output_folder, pid);
+                _exit(0);
+            }
             break;
 
         case TERMINATED_TASK:
             int task_uid = atoi(request->requestArgs);
-            //printf("terminated task had uid %d\n", task_uid);
 
             for (int i = 0; i < parallel_tasks; i++){
                 if (running_tasks[i] != NULL) {
@@ -50,7 +55,10 @@ void parseRequest(REQUEST *request, TaskPriorityQueue *queue, TASK **running_tas
                 }
             }
             break;
-    
+
+        case TERMINATED_STATUS:
+            waitpid(request->pid_requester, NULL, 0);
+
         default:
             break;
     }
@@ -78,6 +86,25 @@ void returnIdToClient(int pid, int uid){
     close(fd);
 }
 
+void sendTerminatedStatus(pid_t pid){
+    int fd =  open(MFIFO, O_WRONLY);
+    if (fd == -1){
+        perror("Erro a abrir fifo principal");
+    }
+
+    REQUEST *request = malloc(sizeof(REQUEST));
+    
+    request->type = TERMINATED_STATUS;
+    request->pid_requester = pid;
+
+    if(write(fd, request, sizeof(REQUEST)) == -1){
+        perror("Error writing terminated task: \n");
+        close(fd);
+    }
+    close(fd);
+}
+
+
 /**
  * Função faz a construção da mensagem com o status do programa
  * Para as tasks que estão a executar usa o array de running_tasks que contem as tasks que estão a decorrer
@@ -85,7 +112,7 @@ void returnIdToClient(int pid, int uid){
  * Para as tasks concluidas lê do ficheiro task_logs que contem as logs serializadas das tarefas
  * 
 */
-void sendStatusToClient(int pid, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder) {
+void sendStatusToClient(int pid, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder, pid_t pid_to_collect) {
     char executing[MAX_SIZE/3];
     char scheduled[MAX_SIZE/3];
     char completed[MAX_SIZE/3];
@@ -147,7 +174,7 @@ void sendStatusToClient(int pid, TaskPriorityQueue *queue, TASK **running_tasks,
     }
 
     close(fd);
-    
+    sendTerminatedStatus(pid_to_collect);
     printf("%s", messageBUFFER);
 }
 
@@ -173,7 +200,6 @@ void sendTerminatedTask(TASK *terminatedTask, pid_t pid){
     }
     close(fd);
 }
-
 
 void checkTasks(TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder) {
     for (int i = 0; i < parallel_tasks; i++) {
@@ -259,17 +285,14 @@ int main(int argc, char **argv){
     }
 
     ssize_t bytesread;
-    //char request[MAX_SIZE];
     REQUEST *request = malloc(sizeof(REQUEST));
 
     while((bytesread = read(fd, request, sizeof(REQUEST))) > 0){
-        // espera ativa
-        //bytesread = read(fd, request, sizeof(REQUEST));
-        //request[bytesread] = '\0';
+        /*if (bytesread < 0){
+            perror("Erro na leitura de requests: \n");
+        }*/
         
-        //if ((request) > 0){
         parseRequest(request, &queue, running_tasks, parallel_tasks, &uid, outputs_folder);
-        //}
 
         checkTasks(&queue, running_tasks, parallel_tasks, outputs_folder);
     }
