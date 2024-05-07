@@ -1,8 +1,9 @@
 #include "../include/task.h"
  
+ /**
+  * Libertar memória alocada para a task
+ */
 void freeTask(TASK **task) {
-    if (task == NULL || *task == NULL) return;
-
     free((*task)->pid);
     free((*task)->program);
     free((*task)->execution_mode);
@@ -11,8 +12,13 @@ void freeTask(TASK **task) {
     free(*task);
 }
 
-TASK *createTask(char *pid, char *request, int *uid) {
+/**
+ * Cria uma task 
+*/
+TASK *createTask(int pid, char *request, int *uid) {
     TASK *task = (TASK*)malloc(sizeof(TASK));
+
+    printf("request: %s\n", request);
     
     char *time = strsep(&request, ";");
     char *mode = strsep(&request, ";");
@@ -32,6 +38,7 @@ TASK *createTask(char *pid, char *request, int *uid) {
             strcat(programs, " | ");
             strcat(arguments, " | ");
         }
+        
         strcat(programs, program ? program : "");
         strcat(arguments, args ? args : "");
     }
@@ -39,11 +46,14 @@ TASK *createTask(char *pid, char *request, int *uid) {
     task->program = strdup(programs);
     task->args = strdup(arguments);
 
+    char pid_str[12];
+    sprintf(pid_str, "%d", pid);
+
     task->uid = ++(*uid);
-    task->pid = strdup(pid);
+    task->pid = strdup(pid_str);
     task->time = strtod(time, NULL);
 
-    printf("Task created: UID %d, PID %s, Time %f, Execution Mode: %s, Programs: %s, Args: %s\n",
+    printf("Task sucessfully created: uid %d, pid %s, Time %.1f, Execution Mode: %s, Programs: %s, Args: %s\n",
            task->uid, task->pid, task->time, task->execution_mode, task->program, task->args);
 
     return task;

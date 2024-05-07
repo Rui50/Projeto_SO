@@ -15,7 +15,7 @@ typedef struct task {
     char *args; //opc
 } TASK;
 
-TASK *createTask(char *pid, char *request, int *uid);
+TASK *createTask(int pid, char *request, int *uid);
 void freeTask(TASK **task);
 
 #endif

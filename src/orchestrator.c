@@ -8,64 +8,61 @@
 #include <sys/time.h>
 
 #include "../include/orchestrator.h"
-#include "../include/requests.h"
 #include "../include/execute.h"
 
 #define MFIFO "../tmp/mfifo"
 #define TASKS_FILE "tasks.txt"
 
-void parseRequest(char *request, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, int *uid, char *output_folder){
+void parseRequest(REQUEST *request, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, int *uid, char *output_folder){
 
-    printf("\nreceived a request for parsing %s\n\n", request);
+    switch (request->type){
 
-    char *pid = strsep(&request, ";");
-    char *mode = strsep(&request, ";");
+        case EXECUTE:
+            TASK *newTask = createTask(request->pid_requester, request->requestArgs, uid);
+            int status = addTask(queue, newTask);
+            if (status == 0){
+                returnIdToClient(request->pid_requester, newTask->uid);
+                printQueueTimes(queue);
+            }
+            else{
+                printf("Error inserting task into the queue\n");
+            }
+            break;
 
-    if(strcmp(mode, "execute") == 0){
-        TASK *newTask = createTask(pid, request, uid);
-        int status = addTask(queue, newTask);
-        if (status == 0){
-            returnIdToClient(pid, newTask->uid);
-            printQueueTimes(queue);
-        }
-        else {
-            printf("ERROR INSERTING TASK INTO THE QUEUE\n");
-        }
-    }
-    else if (strcmp(mode, "status") == 0){
-        printf("STATUS COMMAND EXECUTED\n");
-        sendStatusToClient(pid, queue, running_tasks, parallel_tasks, output_folder);
-    }
+        case STATUS:
+            sendStatusToClient(request->pid_requester, queue, running_tasks, parallel_tasks, output_folder);
+            break;
 
-    else if (strcmp(mode, "terminated_task") == 0){
+        case TERMINATED_TASK:
+            int task_uid = atoi(request->requestArgs);
+            //printf("terminated task had uid %d\n", task_uid);
 
-        int task_uid = atoi(strsep(&request, ";"));
+            for (int i = 0; i < parallel_tasks; i++){
+                if (running_tasks[i] != NULL) {
+                    if(running_tasks[i]->uid == task_uid){
+                        printf("Task with uid %d was removed from running tasks\n", running_tasks[i]->uid);
 
-        printf("terminated task had uid %d\n", task_uid);
+                        waitpid(request->pid_requester, NULL, 0);
 
-        for (int i = 0; i < parallel_tasks; i++){
-            if (running_tasks[i] != NULL) {
-                if(running_tasks[i]->uid == task_uid){
-                    printf("task uid %d removed from running tasks\n", running_tasks[i]->uid);
-
-                    waitpid(atoi(pid), NULL, 0);
-
-                    freeTask(&running_tasks[i]);
-                    running_tasks[i] = NULL;
+                        freeTask(&running_tasks[i]);
+                        running_tasks[i] = NULL;
+                    }
                 }
             }
-        }
-    }
-    else{
-        printf("Request desconhecido\n");
+            break;
+    
+        default:
+            break;
     }
 }
 
-
-void returnIdToClient(char *pid, int uid){
+/**
+ * Função responsavel por enviar o uid ta task ao cliente que fez o request
+*/
+void returnIdToClient(int pid, int uid){
     char fifoName[12];
     char data_buffer[10];
-    sprintf(fifoName, "fifo_%s", pid);
+    sprintf(fifoName, "fifo_%d", pid);
 
     int fd = open(fifoName, O_WRONLY);
     if (fd == -1){
@@ -81,7 +78,14 @@ void returnIdToClient(char *pid, int uid){
     close(fd);
 }
 
-void sendStatusToClient(char *pid, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder) {
+/**
+ * Função faz a construção da mensagem com o status do programa
+ * Para as tasks que estão a executar usa o array de running_tasks que contem as tasks que estão a decorrer
+ * Para as tasks que estão scheduled consulta a queue
+ * Para as tasks concluidas lê do ficheiro task_logs que contem as logs serializadas das tarefas
+ * 
+*/
+void sendStatusToClient(int pid, TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tasks, char *output_folder) {
     char executing[MAX_SIZE/3];
     char scheduled[MAX_SIZE/3];
     char completed[MAX_SIZE/3];
@@ -127,10 +131,11 @@ void sendStatusToClient(char *pid, TaskPriorityQueue *queue, TASK **running_task
         strcat(completed, taskDetails);
     }
 
+    // mensagem final
     snprintf(messageBUFFER, MAX_SIZE, "%s\n%s\n%s", executing, scheduled, completed);
 
     char fifoName[12];
-    sprintf(fifoName, "fifo_%s", pid);
+    sprintf(fifoName, "fifo_%d", pid);
 
     int fd = open(fifoName, O_WRONLY);
     if (fd == -1){
@@ -146,19 +151,26 @@ void sendStatusToClient(char *pid, TaskPriorityQueue *queue, TASK **running_task
     printf("%s", messageBUFFER);
 }
 
+/**
+ * Envia uma mensagem através do fifo principal a avisar que uma task terminou
+ * Isto "acorda" o read para para voltar a executar a prox task
+*/
 void sendTerminatedTask(TASK *terminatedTask, pid_t pid){
     int fd =  open(MFIFO, O_WRONLY);
     if (fd == -1){
         perror("Erro a abrir fifo principal");
     }
+
+    REQUEST *request = malloc(sizeof(REQUEST));
     
-    char data_buffer[MAX_SIZE];
-    snprintf(data_buffer, MAX_SIZE, "%d;terminated_task;%d", pid, terminatedTask->uid);
+    request->type = TERMINATED_TASK;
+    request->pid_requester = pid;
+    snprintf(request->requestArgs, REQUEST_ARGS, "%d", terminatedTask->uid);
 
-    if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
-            perror("Error writing to FIFO");
+    if(write(fd, request, sizeof(REQUEST)) == -1){
+        perror("Error writing terminated task: \n");
+        close(fd);
     }
-
     close(fd);
 }
 
@@ -168,8 +180,7 @@ void checkTasks(TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tas
         //verificar se a posicao ta vazia
         if (running_tasks[i] == NULL && !isQueueEmpty(queue)) {
             running_tasks[i] = getNextTask(queue);
-            printf("\n\nAvaliable index: %d\n", i);
-            printf("New task inserted  into the running_tasks with uid %d\n\n", running_tasks[i]->uid);
+            printf("New task inserted into running_tasks, task uid: %d\n", running_tasks[i]->uid);
 
             if(strcmp(running_tasks[i]->execution_mode, "-u") == 0){
                 pid_t pid = fork();
@@ -199,8 +210,9 @@ void checkTasks(TaskPriorityQueue *queue, TASK **running_tasks, int parallel_tas
 }
 
 int main(int argc, char **argv){
-    if(argc != 4){
-        printf("Usage:  ./orchestrator output_folder parallel-tasks sched-policy\n");
+    if(argc != 3){
+        /*sched-policy nao foi implementado*/
+        printf("Usage:  ./orchestrator output_folder parallel-tasks\n");
         return 1;
     }
 
@@ -236,7 +248,7 @@ int main(int argc, char **argv){
     if (pid_block == 0){
         int fd_block = open(MFIFO, O_WRONLY);
         if(fd_block == -1){
-            perror("Error opening pid for block");
+            perror("Error opening fd: \n");
             exit(1);
         }
 
@@ -247,16 +259,17 @@ int main(int argc, char **argv){
     }
 
     ssize_t bytesread;
-    char request[MAX_SIZE];
+    //char request[MAX_SIZE];
+    REQUEST *request = malloc(sizeof(REQUEST));
 
-    while(1){
+    while((bytesread = read(fd, request, sizeof(REQUEST))) > 0){
         // espera ativa
-        bytesread = read(fd, &request, sizeof(request));
-        request[bytesread] = '\0';
+        //bytesread = read(fd, request, sizeof(REQUEST));
+        //request[bytesread] = '\0';
         
-        if (strlen(request) > 0){
-            parseRequest(request, &queue, running_tasks, parallel_tasks, &uid, outputs_folder);
-        }
+        //if ((request) > 0){
+        parseRequest(request, &queue, running_tasks, parallel_tasks, &uid, outputs_folder);
+        //}
 
         checkTasks(&queue, running_tasks, parallel_tasks, outputs_folder);
     }

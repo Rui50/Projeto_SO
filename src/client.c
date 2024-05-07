@@ -8,8 +8,9 @@
 
 #include "../include/client.h"
 #include "../include/task.h"
+#include "../include/requests.h"
 
-#define MAX_SIZE 500
+#define MAX_SIZE 512
 #define MFIFO "../tmp/mfifo"
 
 int main(int argc, char **argv){
@@ -21,13 +22,12 @@ int main(int argc, char **argv){
 
     int mypid = getpid();
     
-    char data_buffer[MAX_SIZE];
-
     //execute time -u "prog-a [args]"
     if (strcmp(argv[1], "execute") == 0){
         char *exec_time = argv [2];
         // -u -> um programa | -p -> pipeline de programas
         char *mode = argv [3];
+        // programa + args
         char *commands = argv[4];
         
         printf("Opening FIFO for the request\n");
@@ -42,7 +42,11 @@ int main(int argc, char **argv){
         // dados fifo retorno
         char fifoName[12];
         sprintf(fifoName, "fifo_%d", mypid);
+
+        //para guardar o uid da task
         char uidTask[10];
+
+        //pid para string
         char *pid_str = malloc(15 * sizeof(char));
         snprintf(pid_str, 25, "%d", mypid);
 
@@ -51,14 +55,21 @@ int main(int argc, char **argv){
             perror("Error creating return FIFO \n");
         }
 
-        // enviar tambme o seu pid para abrir o fifo de retorno
+        // enviar tambeme o seu pid para abrir o fifo de retorno
+        REQUEST *request = malloc(sizeof(REQUEST));
 
-        snprintf(data_buffer, MAX_SIZE, "%d;execute;%s;%s;%s", mypid,exec_time, mode, commands);
-        printf("Sending request: %s\n", data_buffer);
-        if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
+        request->type = EXECUTE;
+        request->pid_requester = mypid;
+        snprintf(request->requestArgs, REQUEST_ARGS, "%s;%s;%s", exec_time, mode, commands);
+
+        if(write(fd, request, sizeof(REQUEST)) == -1){
             perror("Error writing to FIFO");
+            free(request);
+            close(fd);
+            return -1;
         }
-        // abaixo disto tudo dentro de else? prevenir caso de write falhar e abrir fifo de retorno
+        
+        free(request);
         close(fd);
         
         // abrir fifo para receber o status
@@ -68,10 +79,11 @@ int main(int argc, char **argv){
             return -1;
         }
 
+
         ssize_t bytes_read;
         if((bytes_read = read(fd2, uidTask, sizeof(uidTask) - 1)) > 0){
             uidTask[bytes_read] = '\0';
-            printf("UID RECEIVED: %s\n", uidTask);
+            printf("Submited task uid: %s\n", uidTask);
         }
 
 
@@ -101,14 +113,20 @@ int main(int argc, char **argv){
         
         // mensagem de status 
 
-        snprintf(data_buffer, MAX_SIZE, "%d;status;", mypid); // leva o ; devido ao parsing feito no server
+        REQUEST *request = malloc(sizeof(REQUEST));
 
-        // enviar status msg
-        if (write(fd, data_buffer, strlen(data_buffer)) == -1) {
-            perror("Error writing to FIFO");
+        request->type = STATUS;
+        request->pid_requester = mypid;
+
+        if(write(fd, request, sizeof(REQUEST)) == -1){
+            perror("Error Writing to MFIFO");
+            close(fd);
+            free(request);
+            return -1;
         }
+
+        free(request);
         close(fd);
-        
         
         int fd2 = open(fifoName, O_RDONLY);
         if(fd2 == -1){
@@ -119,16 +137,12 @@ int main(int argc, char **argv){
         ssize_t bytes_read;
         char databuffer[MAX_SIZE];
 
-        if((bytes_read = read(fd2, databuffer, sizeof(data_buffer))) > 0){
-            printf("%s", data_buffer);
+        if((bytes_read = read(fd2, databuffer, sizeof(databuffer))) > 0){
+            printf("%s", databuffer);
         }
 
+        unlink(fifoName);
         close(fd2);
-    }
-    
-    else {
-        printf("Comando desconhecido.\n");
-        return -1;
     }
     return 0;
 }

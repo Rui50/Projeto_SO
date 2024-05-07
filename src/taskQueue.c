@@ -70,9 +70,9 @@ TASK *getNextTask(TaskPriorityQueue *queue){
 } 
 
 void printQueueTimes(TaskPriorityQueue *queue) {
-    printf("Queue Times: [");
+    printf("Queue (times): [");
     for (int i = 0; i < queue->size; i++) {
-        printf("%f", queue->tasks[i]->time);
+        printf("%.1f", queue->tasks[i]->time);
         if (i < queue->size - 1) {
             printf(", ");
         }

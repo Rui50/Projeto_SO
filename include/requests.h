@@ -1,13 +1,19 @@
 #ifndef REQUESTS_H
 #define REQUESTS_H
 
-#include "../include/orchestrator.h"
-
 #define PROGNAME 100
+#define REQUEST_ARGS 518
+
+typedef enum{
+    EXECUTE,
+    STATUS,
+    TERMINATED_TASK
+} TYPE;
 
 typedef struct request {
     int pid_requester;
-    int mode;
+    TYPE type;
+    char requestArgs[REQUEST_ARGS];
 } REQUEST;
 
 typedef struct log {
@@ -15,7 +21,6 @@ typedef struct log {
     double time_to_execute;
     char program_name[PROGNAME];
 } LOG;
-
 
 
 #endif
